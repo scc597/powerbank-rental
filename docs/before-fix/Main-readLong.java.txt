@@ -1,0 +1,102 @@
+/* ===========================================================================
+ * 【修改前版本快照】DEF-01 —— 空输入导致功能不可用
+ * ---------------------------------------------------------------------------
+ * 缺陷描述：
+ *   菜单 3（充值）、5（租借）、7（修改信用分）均提示
+ *   “会员号（直接回车用当前登录会员）：”，但用户按提示直接回车时，
+ *   Long.parseLong("") 抛出 NumberFormatException，程序输出
+ *   “输入不是合法的整数”并取消操作。提示语与实际行为矛盾，主流程不可达。
+ *
+ * 缺陷类型：健壮性缺陷（提示与实现不一致）
+ * 严重程度：严重 —— 阻断主流程
+ *
+ * 根因分析：
+ *   readLong() 缺少空串分支。空输入 trim 后为 ""，
+ *   而 Long.parseLong("") 必定抛 NumberFormatException。
+ *
+ * 修正方案：
+ *   新增 readMemberId(String prompt)：
+ *     - EOF(null)      → null（取消操作）
+ *     - 空串           → -1L（使用当前登录会员）
+ *     - 非法数字       → null 并提示
+ *   并将菜单 3/5/7 的调用点由 readLong() 改为 readMemberId()。
+ *
+ * 本文件仅用于实验报告的「修改前后对比」，不参与主程序编译。
+ * 修正后的实际代码见 src/main/java/com/campus/powerbank/Main.java
+ * ========================================================================= */
+
+package com.campus.powerbank.docs;
+
+/**
+ * DEF-01 缺陷修复前后的代码对比。
+ *
+ * <p>两个方法均为可直接运行的纯函数，便于独立验证行为差异。</p>
+ */
+public final class DefectDef01Snapshot {
+
+    private DefectDef01Snapshot() {
+    }
+
+    /**
+     * 【修改前】读取会员号。
+     *
+     * <p>缺陷点：空串直接进入 {@code Long.parseLong} 抛出
+     * {@link NumberFormatException}，导致“直接回车”功能失效。</p>
+     *
+     * @param line 原始输入行
+     * @return 会员号；空输入与非法输入均返回 null
+     */
+    public static Long readMemberIdBeforeFix(String line) {
+        if (line == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(line.trim());
+        } catch (NumberFormatException e) {
+            System.out.println("输入不是合法的整数。");
+            return null;
+        }
+    }
+
+    /**
+     * 【修改后】读取会员号：允许直接回车，此时返回 -1 表示「使用当前登录会员」。
+     *
+     * @param line 原始输入行
+     * @return 会员号；空输入返回 -1，非法输入返回 null，EOF 返回 null
+     */
+    public static Long readMemberIdAfterFix(String line) {
+        if (line == null) {
+            return null;
+        }
+        String trimmed = line.trim();
+        // 关键修正：新增空输入分支，使提示语与实际行为一致
+        if (trimmed.isEmpty()) {
+            return -1L;
+        }
+        try {
+            return Long.parseLong(trimmed);
+        } catch (NumberFormatException e) {
+            System.out.println("输入不是合法的整数。");
+            return null;
+        }
+    }
+
+    /**
+     * 独立验证入口：对比修改前后在空输入下的行为差异。
+     *
+     * @param args 未使用
+     */
+    public static void main(String[] args) {
+        String blank = "";
+
+        System.out.println("=== DEF-01 修复验证 ===");
+        System.out.println("输入：空串（模拟用户直接回车）");
+        System.out.print("修改前返回值：");
+        Long before = readMemberIdBeforeFix(blank);
+        System.out.println(before + "   → 提示语「直接回车」功能失效");
+
+        System.out.print("修改后返回值：");
+        Long after = readMemberIdAfterFix(blank);
+        System.out.println(after + "   → -1 表示使用当前登录会员，功能正常");
+    }
+}
